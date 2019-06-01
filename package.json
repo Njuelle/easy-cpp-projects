@@ -17,6 +17,7 @@
     "activationEvents": [
         "onCommand:easycpp.createProject",
         "onCommand:easycpp.createClass",
+        "onCommand:easycpp.createSourceFile",
         "workspaceContains:.vscode/tasks.json"
     ],
     "main": "./out/extension",
@@ -29,6 +30,10 @@
             {
                 "command": "easycpp.createClass",
                 "title": "Easy Cpp/C++: Create new class"
+            },
+            {
+                "command": "easycpp.createSourceFile",
+                "title": "Easy Cpp/C++: Create new source file"
             },
             {
                 "command": "easycpp.createGetterSetter",
