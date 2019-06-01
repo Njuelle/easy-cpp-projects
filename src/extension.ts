@@ -4,7 +4,7 @@ import * as vscode from 'vscode';
 import { mkdirSync, writeFileSync, existsSync } from 'fs';
 import fetch from 'node-fetch';
 
-const baseUrl = 'https://raw.githubusercontent.com/acharluk/easy-cpp-projects/master';
+const baseUrl = 'https://raw.githubusercontent.com/njuelle/easy-cpp-projects/master';
 
 interface EasyProjectsJSON {
     directories: string[];
