@@ -23,6 +23,7 @@ interface EasyClassesJSON {
 export function activate(context: vscode.ExtensionContext) {
     let createProjectCommand = vscode.commands.registerCommand('easycpp.createProject', createProject);
     let createClassCommand = vscode.commands.registerCommand('easycpp.createClass', createClass);
+    let createSourceFileCommand = vscode.commands.registerCommand('easycpp.createSourceFile', createSourceFile);
     let createGetterSetterCommand = vscode.commands.registerCommand('easycpp.createGetterSetter', createGetterSetter);
     let createGetterCommand = vscode.commands.registerCommand('easycpp.createGetter', createGetter);
     let createSetterCommand = vscode.commands.registerCommand('easycpp.createSetter', createSetter);
@@ -43,6 +44,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(buildAndRunButton);
     context.subscriptions.push(createProjectCommand);
     context.subscriptions.push(createClassCommand);
+    context.subscriptions.push(createSourceFileCommand);
     context.subscriptions.push(createGetterSetterCommand);
     context.subscriptions.push(createGetterCommand);
     context.subscriptions.push(createSetterCommand);
@@ -53,7 +55,7 @@ export function deactivate() {
 
 const createClass = async () => {
     try {
-        const  data = await fetch(`${baseUrl}/templates/classes/files.json`);
+        const data = await fetch(`${baseUrl}/templates/classes/files.json`);
         const templates: EasyClassesJSON = await data.json();
         const template_files = [];
         for (let tname in templates) { template_files.push(tname); }
@@ -62,7 +64,7 @@ const createClass = async () => {
         if (!selected) { return; }
 
         const val = await vscode.window.showInputBox({ prompt: `Enter class name` });
-        if (!val || ! vscode.window.activeTextEditor) { return; }
+        if (!val || !vscode.window.activeTextEditor) { return; }
 
         const currentFolderWorkspace = vscode.workspace.getWorkspaceFolder(vscode.window.activeTextEditor.document.uri);
         if (!currentFolderWorkspace) { return; }
@@ -75,9 +77,38 @@ const createClass = async () => {
             writeFileSync(`${currentFolder}/${templates[selected][file].folder}/${val}.${templates[selected][file].extension}`, data);
 
             vscode.workspace.openTextDocument(`${currentFolder}/${templates[selected][file].folder}/${val}.${templates[selected][file].extension}`)
-            .then(doc => vscode.window.showTextDocument(doc, { preview: false }));
+                .then(doc => vscode.window.showTextDocument(doc, { preview: false }));
         }
-    } catch(err) {
+    } catch (err) {
+        vscode.window.showErrorMessage(`Easy C++ error: ${err}`);
+    }
+};
+
+const createSourceFile = async () => {
+    try {
+        const fileName = await vscode.window.showInputBox({ prompt: `Enter file name` });
+        if (!fileName || !vscode.window.activeTextEditor) { return; }
+
+        const currentFolderWorkspace = vscode.workspace.getWorkspaceFolder(vscode.window.activeTextEditor.document.uri);
+        if (!currentFolderWorkspace) { return; }
+
+        const currentFolder = currentFolderWorkspace.uri.fsPath;
+
+        // Create source file .cpp
+        const fileTpl = await fetch(`${baseUrl}/templates/sourcefile/sourcefile.cpp`);
+        let data = await fileTpl.text();
+        data = data.replace(new RegExp('sourcefile', 'g'), fileName);
+        writeFileSync(`${currentFolder}/src/${fileName}.cpp`, data);
+
+        // Create header file .hpp
+        const headerFileTpl = await fetch(`${baseUrl}/templates/sourcefile/sourcefile.hpp`);
+        let dataHeader = await headerFileTpl.text();
+        dataHeader = dataHeader.replace(new RegExp('sourcefile', 'g'), `${fileName.toUpperCase()}_H_INCLUDED`);
+        writeFileSync(`${currentFolder}/include/${fileName}.hpp`, dataHeader);
+
+        vscode.workspace.openTextDocument(`${currentFolder}/src/${fileName}.cpp`)
+            .then(doc => vscode.window.showTextDocument(doc, { preview: false }));
+    } catch (err) {
         vscode.window.showErrorMessage(`Easy C++ error: ${err}`);
     }
 };
@@ -90,15 +121,15 @@ const createProject = async () => {
 
     try {
         const res = await fetch(`${baseUrl}/templates/project/files.json`);
-        const  data = await res.json();
+        const data = await res.json();
         let templates = [];
         for (let tname in data.templates) { templates.push(tname); }
 
         const selected = await vscode.window.showQuickPick(templates);
         await selectFolderAndDownload(data, selected);
-        vscode.workspace.getConfiguration('files').update('associations', { "*.tpp":"cpp" }, vscode.ConfigurationTarget.Workspace);
+        vscode.workspace.getConfiguration('files').update('associations', { "*.tpp": "cpp" }, vscode.ConfigurationTarget.Workspace);
         vscode.workspace.getConfiguration('terminal.integrated.shell').update('windows', "cmd.exe", vscode.ConfigurationTarget.Workspace);
-    } catch(error) {
+    } catch (error) {
         vscode.window.showErrorMessage(`Easy C++ Projects error: Could not fetch 'files.json' from GitHub\nError: ${error}`);
     }
 };
@@ -112,7 +143,7 @@ const selectFolderAndDownload = async (files: EasyProjectsJSON, templateName: st
             if (!chosen) { return; }
             let folder = chosen.uri;
             await downloadTemplate(files, templateName, folder.fsPath);
-        } catch(err) {
+        } catch (err) {
             vscode.window.showErrorMessage(`Easy C++ error: ${err}`);
         }
 
@@ -135,42 +166,46 @@ const downloadTemplate = async (files: EasyProjectsJSON, templateName: string, f
             writeFileSync(`${folder}/${files.templates[templateName][file]}`, data);
             if (files.templates[templateName][file] === 'src/main.cpp') {
                 vscode.workspace.openTextDocument(`${folder}/src/main.cpp`)
-                .then(doc => vscode.window.showTextDocument(doc, { preview: false }));
+                    .then(doc => vscode.window.showTextDocument(doc, { preview: false }));
             }
-        } catch(error) {
+        } catch (error) {
             vscode.window.showErrorMessage(`Easy C++ Projects error: Could not download '${file}' from GitHub\nError: ${error}`);
         }
     }
 };
 
 
-const createGetterSetter = (getter ?: boolean, setter ?: boolean) => {
+const createGetterSetter = (getter?: boolean, setter?: boolean) => {
     if (!getter && !setter) {
         getter = setter = true;
     }
     let editor = vscode.window.activeTextEditor;
     if (!editor) { return; }
 
-    const getterSnippet = (variableName: string, variableType: string) => { return new vscode.SnippetString(`
+    const getterSnippet = (variableName: string, variableType: string) => {
+        return new vscode.SnippetString(`
     ${variableType} get${variableName.charAt(0).toUpperCase() + variableName.substring(1)}() {
         return ${variableName};
     }
-    `);};
-    const setterSnippet = (variableName: string, variableType: string) => { return new vscode.SnippetString(`
+    `);
+    };
+    const setterSnippet = (variableName: string, variableType: string) => {
+        return new vscode.SnippetString(`
     void set${variableName.charAt(0).toUpperCase() + variableName.substring(1)}(${variableType} ${variableName}) {
         this->${variableName} = ${variableName};
     }
-    `);};
+    `);
+    };
 
     let selection = editor.selection;
     let selectedText = editor.document.getText(new vscode.Range(selection.start, selection.end)).trim();
 
     let lines = selectedText.split('\n');
 
-    let createData :{type: string, name: string}[] = [];
+    let createData: { type: string, name: string }[] = [];
 
     for (let line of lines) {
-        if(!/\s*\w+\s+[*]*\w+\s*(,\s*\w+\s*)*;+/.test(line)) {
+        if (!/\s*\w+\s+[*]*\w+\s*(,\s*\w+\s*)*;+/.test(line)) {
             vscode.window.showErrorMessage(`Syntax error, cannot create getter or setter: ${line}`);
             return;
         }
@@ -192,8 +227,8 @@ const createGetterSetter = (getter ?: boolean, setter ?: boolean) => {
     }
 
     for (let e of createData) {
-        if (getter) { editor.insertSnippet(getterSnippet(e.name, e.type), new vscode.Position(selection.end.line+1, 0)); }
-        if (setter) { editor.insertSnippet(setterSnippet(e.name, e.type), new vscode.Position(selection.end.line+1, 0)); }
+        if (getter) { editor.insertSnippet(getterSnippet(e.name, e.type), new vscode.Position(selection.end.line + 1, 0)); }
+        if (setter) { editor.insertSnippet(setterSnippet(e.name, e.type), new vscode.Position(selection.end.line + 1, 0)); }
     }
 };
 
